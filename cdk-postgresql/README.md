@@ -65,6 +65,20 @@ const role = new Role(this, "Role", {
 });
 ```
 
+### Role with IAM database authentication
+
+```typescript
+import { RoleRdsIam } from "@botpress/cdk-postgresql";
+
+const role = new RoleRdsIam(this, "RoleRdsIam", {
+  provider,
+  name: "newrole",
+  removalPolicy: cdk.RemovalPolicy.RETAIN, // Default is DESTROY
+});
+```
+
+https://aws.amazon.com/premiumsupport/knowledge-center/rds-postgresql-connect-using-iam/
+
 ## Tips
 
 ### Creating a `Role` before a `Database`
