@@ -5,6 +5,7 @@ import * as secretsmanager from "aws-cdk-lib/aws-secretsmanager";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
 import { Construct } from "constructs";
 import { Role } from "@botpress/cdk-postgresql/lib/role";
+import { RoleRdsIam } from "@botpress/cdk-postgresql/lib/role-rds-iam";
 import { Database } from "@botpress/cdk-postgresql/lib/database";
 
 interface AppStackProps extends cdk.StackProps {
@@ -42,12 +43,19 @@ export class AppStack extends cdk.Stack {
     });
 
     const roleName = `role-${this.stackName}`;
+    const roleRdsIamName = `role-rds-iam-${this.stackName}`;
     const dbName = `db-${this.stackName}`;
 
     const role = new Role(this, "Role", {
       provider: privateProvider,
       name: roleName,
       password: rolePassword,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const roleRdsIam = new RoleRdsIam(this, "RoleRdsIam", {
+      provider: privateProvider,
+      name: roleRdsIamName,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
