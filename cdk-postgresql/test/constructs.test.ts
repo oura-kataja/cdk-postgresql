@@ -185,3 +185,85 @@ describe("role", () => {
     template.resourceCountIs("AWS::Lambda::Function", 3);
   });
 });
+
+
+describe("role-rds-iam", () => {
+  test("has correct props", () => {
+    const app = new cdk.App();
+    const stack = new TestStack(app, "Stack");
+
+    const connectionPassword = new secretsmanager.Secret(
+      stack,
+      "ConnectionPassword"
+    );
+
+    const host = "somedb.com";
+    const username = "theusername";
+    const name = "rolename";
+    const provider = new Provider(stack, "provider", {
+      host,
+      username,
+      password: connectionPassword,
+    });
+
+    new RoleRdsIam(stack, "Role", {
+      name,
+      provider,
+    });
+
+    const template = Template.fromStack(stack);
+    template.resourceCountIs("Custom::Postgresql-RoleRdsIam", 1);
+    template.hasResourceProperties("Custom::Postgresql-RoleRdsIam", {
+      Connection: {
+        Host: host,
+        Port: 5432,
+        Database: "postgres",
+        Username: username,
+        PasswordArn: {
+          Ref: getLogicalId(connectionPassword),
+        },
+        SSLMode: "require",
+      },
+      Name: name,
+    });
+  });
+
+  test("creates singleton lambda", () => {
+    const app = new cdk.App();
+    const stack = new TestStack(app, "Stack");
+
+    const connectionPassword = new secretsmanager.Secret(
+      stack,
+      "ConnectionPassword"
+    );
+    const host = "somedb.com";
+    const username = "theusername";
+    const name = "mydb";
+    const n = 5;
+
+    const provider = new Provider(stack, "provider", {
+      host,
+      username,
+      password: connectionPassword,
+    });
+
+    for (let i = 0; i < n; i++) {
+      new RoleRdsIam(stack, `RoleRdsIam${i}`, {
+        name,
+        provider,
+      });
+    }
+
+    const template = Template.fromStack(stack);
+
+    // we expect n Roles
+    template.resourceCountIs("Custom::Postgresql-RoleRdsIam", n);
+
+    // but only 3 Functions:
+    // * 1 for the Role handler (created by us)
+    // * 1 for the Role provider (created by us)
+    // * 1 for the LogRetention (created by the CDK))
+    template.resourceCountIs("AWS::Lambda::Function", 3);
+  });
+});
+

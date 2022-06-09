@@ -85,3 +85,34 @@ export interface UpdateRoleEvent
     PasswordArn: string;
   };
 }
+
+export interface CreateRoleRdsIamEvent
+  extends CloudFormationCustomResourceCreateEvent {
+  ResourceProperties: {
+    ServiceToken: string;
+    Connection: Connection;
+    Name: string;
+  };
+}
+
+export interface DeleteRoleRdsIamEvent
+  extends CloudFormationCustomResourceDeleteEvent {
+  ResourceProperties: {
+    ServiceToken: string;
+    Connection: Connection;
+    Name: string;
+  };
+}
+
+export interface UpdateRoleRdsIamEvent
+  extends CloudFormationCustomResourceUpdateEvent {
+  ResourceProperties: {
+    ServiceToken: string;
+    Connection: Connection;
+    Name: string;
+  };
+  OldResourceProperties: {
+    Connection: Connection;
+    Name: string;
+  };
+}

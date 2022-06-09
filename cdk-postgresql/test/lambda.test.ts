@@ -1,19 +1,23 @@
 import { handler as dbHandler } from "../lib/database.handler";
 import { handler as roleHandler, updateRoleName } from "../lib/role.handler";
+import { handler as roleRdsIamHandler } from "../lib/role-rds-iam.handler";
 const utilModule = require("../lib/util");
 import { GenericContainer, StartedTestContainer } from "testcontainers";
 import ms from "ms";
 import {
   CreateDatabaseEvent,
   CreateRoleEvent,
+  CreateRoleRdsIamEvent,
   DeleteDatabaseEvent,
   DeleteRoleEvent,
+  DeleteRoleRdsIamEvent,
   UpdateDatabaseEvent,
   UpdateRoleEvent,
+  UpdateRoleRdsIamEvent,
 } from "../lib/lambda.types";
 import { SecretsManager } from "@aws-sdk/client-secrets-manager";
 import { Client } from "pg";
-import { createDatabase, createRole } from "../lib/postgres";
+import { createDatabase, createRole, createRoleRdsIam } from "../lib/postgres";
 import { createSecret, dbExists, getDbOwner, roleExists } from "./helpers";
 import { secretsmanager } from "../lib/util";
 
@@ -280,6 +284,158 @@ describe("role", () => {
     await client.connect();
 
     await client.end();
+  });
+});
+
+describe("role-rds-iam", () => {
+  test("create", async () => {
+    const newRolePwd = "rolepwd";
+    const newRoleName = "myuser";
+
+    const event: CreateRoleRdsIamEvent = {
+      RequestType: "Create",
+      ServiceToken: "",
+      ResponseURL: "",
+      StackId: "",
+      RequestId: "",
+      LogicalResourceId: "",
+      ResourceType: "",
+      ResourceProperties: {
+        ServiceToken: "",
+        Connection: {
+          Host: pgHost,
+          Port: pgPort,
+          Username: DB_MASTER_USERNAME,
+          Database: DB_DEFAULT_DB,
+          PasswordArn: masterPasswordArn,
+          SSLMode: "disable",
+        },
+        Name: newRoleName,
+      },
+    };
+
+    await roleRdsIamHandler(event);
+
+    // try connecting as the new role
+    const client = new Client({
+      host: pgHost,
+      port: pgPort,
+      database: DB_DEFAULT_DB,
+      user: newRoleName,
+      password: newRolePwd,
+    });
+    await client.connect();
+
+    await client.end();
+  });
+
+  test("delete", async () => {
+    const masterClient = new Client({
+      host: pgHost,
+      port: pgPort,
+      database: DB_DEFAULT_DB,
+      user: DB_MASTER_USERNAME,
+      password: DB_MASTER_PASSWORD,
+    });
+    await masterClient.connect();
+
+    const newRoleName = "myuser";
+    await createRoleRdsIam({
+      client: masterClient,
+      name: newRoleName,
+    });
+
+    const event: DeleteRoleRdsIamEvent = {
+      RequestType: "Delete",
+      ServiceToken: "",
+      ResponseURL: "",
+      StackId: "",
+      RequestId: "",
+      LogicalResourceId: "",
+      PhysicalResourceId: "",
+      ResourceType: "",
+      ResourceProperties: {
+        ServiceToken: "",
+        Connection: {
+          Host: pgHost,
+          Port: pgPort,
+          Username: DB_MASTER_USERNAME,
+          Database: DB_DEFAULT_DB,
+          PasswordArn: masterPasswordArn,
+          SSLMode: "disable",
+        },
+        Name: newRoleName,
+      },
+    };
+
+    await roleRdsIamHandler(event);
+
+    expect(await roleExists(masterClient, newRoleName)).toEqual(false);
+
+    await masterClient.end();
+  });
+
+  test("update", async () => {
+    const masterClient = new Client({
+      host: pgHost,
+      port: pgPort,
+      database: DB_DEFAULT_DB,
+      user: DB_MASTER_USERNAME,
+      password: DB_MASTER_PASSWORD,
+    });
+    await masterClient.connect();
+
+    const roleName = "myuser";
+    await createRoleRdsIam({
+      client: masterClient,
+      name: roleName,
+    });
+
+    const updatedRoleName = roleName + "updated";
+
+    const event: UpdateRoleRdsIamEvent = {
+      RequestType: "Update",
+      ServiceToken: "",
+      ResponseURL: "",
+      StackId: "",
+      RequestId: "",
+      LogicalResourceId: "",
+      PhysicalResourceId: "",
+      ResourceType: "",
+      ResourceProperties: {
+        ServiceToken: "",
+        Connection: {
+          Host: pgHost,
+          Port: pgPort,
+          Username: DB_MASTER_USERNAME,
+          Database: DB_DEFAULT_DB,
+          PasswordArn: masterPasswordArn,
+          SSLMode: "disable",
+        },
+        Name: updatedRoleName,
+      },
+      OldResourceProperties: {
+        Connection: {
+          Host: pgHost,
+          Port: pgPort,
+          Username: DB_MASTER_USERNAME,
+          Database: DB_DEFAULT_DB,
+          PasswordArn: masterPasswordArn,
+          SSLMode: "disable",
+        },
+        Name: roleName,
+      },
+    };
+
+    await roleRdsIamHandler(event);
+
+    // try connecting as the updated role is not supported by test container
+
+    expect(await roleExists(masterClient, updatedRoleName)).toEqual(true);
+    expect(await roleExists(masterClient, roleName)).toEqual(false);
+
+
+    await masterClient.end();
   });
 });
 
